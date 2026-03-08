@@ -29,6 +29,7 @@ df_all["id_img"] = df_all.index
 train["id_img"] = df_all.loc[:len(train)-1, "id_img"].values
 dev["id_img"] = df_all.loc[len(train):len(train)+len(dev)-1, "id_img"].values
 test["id_img"] = df_all.loc[len(train)+len(dev):, "id_img"].values
+test["id_test"] = test["id_img"]
 
 # -----------------------------
 # 4. Generar embeddings con MiniLM
@@ -45,11 +46,20 @@ embeddings = np.array(embeddings).astype("float32")
 with open(f"{base_path}/IMG_VEC", "wb") as f:
     pickle.dump(embeddings, f)
 
+train = train.reset_index(drop=True)
+dev = dev.reset_index(drop=True)
+test = test.reset_index(drop=True)
+
+train["take"] = 1
+dev["is_dev"] = 1
+test["is_dev"] = 1
+
 train.to_pickle(f"{base_path}/TRAIN_IMG")
 dev.to_pickle(f"{base_path}/DEV_IMG")
 test.to_pickle(f"{base_path}/TEST_IMG")
 
 train_dev = pd.concat([train, dev], ignore_index=True)
+train_dev["take"] = 1
 train_dev.to_pickle(f"{base_path}/TRAIN_DEV_IMG")
 
 print("Todo generado correctamente en:", base_path)
