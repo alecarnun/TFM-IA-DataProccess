@@ -29,7 +29,14 @@ df_all["id_img"] = df_all.index
 train["id_img"] = df_all.loc[:len(train)-1, "id_img"].values
 dev["id_img"] = df_all.loc[len(train):len(train)+len(dev)-1, "id_img"].values
 test["id_img"] = df_all.loc[len(train)+len(dev):, "id_img"].values
-test["id_test"] = test["id_img"]
+
+train["id_user"] = train["id_user"].astype("category").cat.codes
+dev["id_user"] = dev["id_user"].astype("category").cat.codes
+test["id_user"] = test["id_user"].astype("category").cat.codes
+
+train["id_img"] = train["id_img"].astype("category").cat.codes
+dev["id_img"] = dev["id_img"].astype("category").cat.codes
+test["id_img"] = test["id_img"].astype("category").cat.codes
 
 # -----------------------------
 # 4. Generar embeddings con MiniLM
@@ -54,12 +61,17 @@ train["take"] = 1
 dev["is_dev"] = 1
 test["is_dev"] = 1
 
+train["id_test"] = train.index
+dev["id_test"] = dev.index
+test["id_test"] = test.index
+
 train.to_pickle(f"{base_path}/TRAIN_IMG")
 dev.to_pickle(f"{base_path}/DEV_IMG")
 test.to_pickle(f"{base_path}/TEST_IMG")
 
 train_dev = pd.concat([train, dev], ignore_index=True)
 train_dev["take"] = 1
+train_dev["id_test"] = train_dev.index
 train_dev.to_pickle(f"{base_path}/TRAIN_DEV_IMG")
 
 print("Todo generado correctamente en:", base_path)
