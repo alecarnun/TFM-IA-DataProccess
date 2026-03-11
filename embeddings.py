@@ -24,12 +24,15 @@ df_all = df_all.reset_index(drop=True)
 df_all["id_img"] = df_all.index
 
 # -----------------------------
-# 3. Repartir id_img a cada split
+# 3. Repartir id_img a cada split  ← NECESARIO
 # -----------------------------
 train["id_img"] = df_all.loc[:len(train)-1, "id_img"].values
 dev["id_img"] = df_all.loc[len(train):len(train)+len(dev)-1, "id_img"].values
 test["id_img"] = df_all.loc[len(train)+len(dev):, "id_img"].values
 
+# -----------------------------
+# 3.1 Convertir id_user e id_img a códigos numéricos
+# -----------------------------
 train["id_user"] = train["id_user"].astype("category").cat.codes
 dev["id_user"] = dev["id_user"].astype("category").cat.codes
 test["id_user"] = test["id_user"].astype("category").cat.codes
@@ -37,6 +40,17 @@ test["id_user"] = test["id_user"].astype("category").cat.codes
 train["id_img"] = train["id_img"].astype("category").cat.codes
 dev["id_img"] = dev["id_img"].astype("category").cat.codes
 test["id_img"] = test["id_img"].astype("category").cat.codes
+
+# -----------------------------
+# 3.2 Convertir a int32 (OBLIGATORIO PARA EMBEDDINGS)
+# -----------------------------
+train["id_user"] = train["id_user"].astype("int32")
+dev["id_user"] = dev["id_user"].astype("int32")
+test["id_user"] = test["id_user"].astype("int32")
+
+train["id_img"] = train["id_img"].astype("int32")
+dev["id_img"] = dev["id_img"].astype("int32")
+test["id_img"] = test["id_img"].astype("int32")
 
 # -----------------------------
 # 4. Generar embeddings con MiniLM
