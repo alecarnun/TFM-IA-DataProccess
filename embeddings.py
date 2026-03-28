@@ -19,8 +19,7 @@ test = pd.read_pickle(f"{base_path}/test.pkl")
 # -----------------------------
 # 2. Unir los tres conjuntos para asignar un id a cada reseña
 # -----------------------------
-df_all = pd.concat([train, dev, test], ignore_index=True)
-df_all = df_all.reset_index(drop=True)
+df_all = pd.concat([train, dev, test], ignore_index=True).reset_index(drop=True)
 df_all["id_img"] = df_all.index
 
 # -----------------------------
@@ -31,26 +30,12 @@ dev["id_img"] = df_all.loc[len(train):len(train)+len(dev)-1, "id_img"].values
 test["id_img"] = df_all.loc[len(train)+len(dev):, "id_img"].values
 
 # -----------------------------
-# 3.1 Convertir id_user e id_img a códigos numéricos
+# 3. Codificar usuarios e imágenes
 # -----------------------------
-train["id_user"] = train["id_user"].astype("category").cat.codes
-dev["id_user"] = dev["id_user"].astype("category").cat.codes
-test["id_user"] = test["id_user"].astype("category").cat.codes
-
-train["id_img"] = train["id_img"].astype("category").cat.codes
-dev["id_img"] = dev["id_img"].astype("category").cat.codes
-test["id_img"] = test["id_img"].astype("category").cat.codes
-
-# -----------------------------
-# 3.2 Convertir a int32 (OBLIGATORIO PARA EMBEDDINGS)
-# -----------------------------
-train["id_user"] = train["id_user"].astype("int32")
-dev["id_user"] = dev["id_user"].astype("int32")
-test["id_user"] = test["id_user"].astype("int32")
-
-train["id_img"] = train["id_img"].astype("int32")
-dev["id_img"] = dev["id_img"].astype("int32")
-test["id_img"] = test["id_img"].astype("int32")
+for df in [train, dev, test]:
+    df["id_user"] = df["id_user"].astype("category").cat.codes.astype("int32")
+    df["id_img"] = df["id_img"].astype("category").cat.codes.astype("int32")
+    df["id_restaurant"] = df["id_restaurant"].astype("category").cat.codes.astype("int32")
 
 # -----------------------------
 # 4. Generar embeddings con MiniLM
@@ -61,32 +46,97 @@ texts = df_all["review_full"].tolist()
 embeddings = model.encode(texts, show_progress_bar=True)
 embeddings = np.array(embeddings).astype("float32")
 
-# -----------------------------
-# 5. Guardado
-# -----------------------------
 with open(f"{base_path}/IMG_VEC", "wb") as f:
     pickle.dump(embeddings, f)
 
-train = train.reset_index(drop=True)
-dev = dev.reset_index(drop=True)
-test = test.reset_index(drop=True)
+# -----------------------------
+# 5. Construir DEV_IMG con negativos
+# -----------------------------
+dev_rows = []
 
+for idx, row in dev.iterrows():
+    user = row["id_user"]
+    rest = row["id_restaurant"]
+    img = row["id_img"]
+
+    # POSITIVO
+    dev_rows.append({
+        "id_user": user,
+        "id_img": img,
+        "id_restaurant": rest,
+        "is_dev": 1,
+        "id_test": idx
+    })
+
+    # NEGATIVOS: todas las fotos del mismo restaurante en TRAIN
+    negs = train[train["id_restaurant"] == rest]
+
+    for _, neg in negs.iterrows():
+        dev_rows.append({
+            "id_user": user,
+            "id_img": neg["id_img"],
+            "id_restaurant": rest,
+            "is_dev": 0,
+            "id_test": idx
+        })
+
+DEV_IMG = pd.DataFrame(dev_rows)
+
+# -----------------------------
+# 6. Construir TEST_IMG igual que DEV_IMG
+# -----------------------------
+train_dev_base = pd.concat([train, dev], ignore_index=True).reset_index(drop=True)
+train_dev_base["id_img"] = train_dev_base["id_img"].astype("int32")
+train_dev_base["id_restaurant"] = train_dev_base["id_restaurant"].astype("int32")
+
+test_rows = []
+
+for idx, row in test.iterrows():
+    user = row["id_user"]
+    rest = row["id_restaurant"]
+    img = row["id_img"]
+
+    # POSITIVO
+    test_rows.append({
+        "id_user": user,
+        "id_img": img,
+        "id_restaurant": rest,
+        "is_dev": 1,
+        "id_test": idx
+    })
+
+    # NEGATIVOS
+    negs = train_dev_base[train_dev_base["id_restaurant"] == rest]
+
+    for _, neg in negs.iterrows():
+        test_rows.append({
+            "id_user": user,
+            "id_img": neg["id_img"],
+            "id_restaurant": rest,
+            "is_dev": 0,
+            "id_test": idx
+        })
+
+TEST_IMG = pd.DataFrame(test_rows)
+
+# -----------------------------
+# 7. TRAIN_IMG y TRAIN_DEV_IMG
+# -----------------------------
 train["take"] = 1
-dev["is_dev"] = 1
-test["is_dev"] = 1
-
 train["id_test"] = train.index
-dev["id_test"] = dev.index
-test["id_test"] = test.index
+TRAIN_IMG = train.copy()
 
-train.to_pickle(f"{base_path}/TRAIN_IMG")
-dev.to_pickle(f"{base_path}/DEV_IMG")
-test.to_pickle(f"{base_path}/TEST_IMG")
+train_dev_for_training = pd.concat([train, dev], ignore_index=True)
+train_dev_for_training["take"] = 1
+train_dev_for_training["id_test"] = train_dev_for_training.index
+TRAIN_DEV_IMG = train_dev_for_training.copy()
 
-train_dev = pd.concat([train, dev], ignore_index=True)
-train_dev["take"] = 1
-train_dev["id_test"] = train_dev.index
-train_dev.to_pickle(f"{base_path}/TRAIN_DEV_IMG")
+# -----------------------------
+# 8. Guardado final
+# -----------------------------
+TRAIN_IMG.to_pickle(f"{base_path}/TRAIN_IMG")
+DEV_IMG.to_pickle(f"{base_path}/DEV_IMG")
+TEST_IMG.to_pickle(f"{base_path}/TEST_IMG")
+TRAIN_DEV_IMG.to_pickle(f"{base_path}/TRAIN_DEV_IMG")
 
-print("Todo generado correctamente en:", base_path)
-print("Archivos creados: TRAIN_IMG, DEV_IMG, TEST_IMG, TRAIN_DEV_IMG, IMG_VEC")
+print("Todo generado correctamente.")
