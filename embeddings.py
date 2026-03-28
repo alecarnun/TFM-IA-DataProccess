@@ -132,6 +132,12 @@ train_dev_for_training["id_test"] = train_dev_for_training.index
 TRAIN_DEV_IMG = train_dev_for_training.copy()
 
 # -----------------------------
+# Añadir número de imágenes por test case
+# -----------------------------
+DEV_IMG["testcase_num_images"] = DEV_IMG.groupby("id_test")["id_img"].transform("count")
+TEST_IMG["testcase_num_images"] = TEST_IMG.groupby("id_test")["id_img"].transform("count")
+
+# -----------------------------
 # 8. Guardado final
 # -----------------------------
 TRAIN_IMG.to_pickle(f"{base_path}/TRAIN_IMG")
