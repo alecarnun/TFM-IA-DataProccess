@@ -1,10 +1,9 @@
 import pandas as pd
 import os
 from langdetect import detect, LangDetectException
-from sklearn.model_selection import train_test_split
 
-csv_path = "barcelona.csv"
-city_name = "barcelona"
+csv_path = "madrid.csv"
+city_name = "madrid"
 
 # ============================================================
 # 1. Cargar CSV original (NO se modifica)
@@ -76,7 +75,24 @@ train_df = pd.concat([train_df, df_1], ignore_index=True)
 # ============================================================
 # 10. Crear validation desde train
 # ============================================================
-train_df, val_df = train_test_split(train_df, test_size=0.15, random_state=42)
+train_rows_final = []
+val_rows = []
+
+for user, group in train_df.groupby("id_user"):
+    group = group.sort_values("date")
+
+    if len(group) >= 2:
+        # última -> validation
+        val_rows.append(group.iloc[-1].to_dict())
+
+        # resto -> train
+        train_rows_final.extend(group.iloc[:-1].to_dict("records"))
+    else:
+        # usuarios con 1 reseña -> se quedan en train
+        train_rows_final.extend(group.to_dict("records"))
+
+train_df = pd.DataFrame(train_rows_final)
+val_df = pd.DataFrame(val_rows)
 
 # ============================================================
 # 11. Crear id_restaurant SOLO en los splits finales

@@ -4,7 +4,7 @@ import pickle
 from sentence_transformers import SentenceTransformer
 import os
 
-city = "barcelona"
+city = "madrid"
 base_path = f"preprocessed/{city}"
 
 os.makedirs(base_path, exist_ok=True)
@@ -16,31 +16,36 @@ train = pd.read_pickle(f"{base_path}/train.pkl")
 dev = pd.read_pickle(f"{base_path}/val.pkl")
 test = pd.read_pickle(f"{base_path}/test.pkl")
 
+# Guardar tamaños originales
+n_train = len(train)
+n_dev = len(dev)
+n_test = len(test)
+
 # -----------------------------
-# 2. Unir los tres conjuntos para asignar un id a cada reseña
+# 2. Unir conjuntos
 # -----------------------------
 df_all = pd.concat([train, dev, test], ignore_index=True).reset_index(drop=True)
-df_all["id_img"] = df_all.index
+
+# ID único por reseña
+df_all["id_img"] = df_all.index.astype("int32")
 
 # -----------------------------
-# 3. Repartir id_img a cada split  ← NECESARIO
+# 3. Codificación para todos
 # -----------------------------
-train["id_img"] = df_all.loc[:len(train)-1, "id_img"].values
-dev["id_img"] = df_all.loc[len(train):len(train)+len(dev)-1, "id_img"].values
-test["id_img"] = df_all.loc[len(train)+len(dev):, "id_img"].values
+df_all["id_user"] = df_all["id_user"].astype("category").cat.codes.astype("int32")
+df_all["id_restaurant"] = df_all["id_restaurant"].astype("category").cat.codes.astype("int32")
 
 # -----------------------------
-# 3. Codificar usuarios e imágenes
+# 4. Volver a separar splits
 # -----------------------------
-for df in [train, dev, test]:
-    df["id_user"] = df["id_user"].astype("category").cat.codes.astype("int32")
-    df["id_img"] = df["id_img"].astype("category").cat.codes.astype("int32")
-    df["id_restaurant"] = df["id_restaurant"].astype("category").cat.codes.astype("int32")
+train = df_all.iloc[:n_train].copy()
+dev = df_all.iloc[n_train:n_train+n_dev].copy()
+test = df_all.iloc[n_train+n_dev:].copy()
 
 # -----------------------------
-# 4. Generar embeddings con MiniLM
+# 5. Generar embeddings
 # -----------------------------
-model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2")
 
 texts = df_all["review_full"].tolist()
 embeddings = model.encode(texts, show_progress_bar=True)
@@ -50,7 +55,7 @@ with open(f"{base_path}/IMG_VEC", "wb") as f:
     pickle.dump(embeddings, f)
 
 # -----------------------------
-# 5. Construir DEV_IMG con negativos
+# 6. DEV_IMG (negativos desde TRAIN)
 # -----------------------------
 dev_rows = []
 
@@ -68,8 +73,11 @@ for idx, row in dev.iterrows():
         "id_test": idx
     })
 
-    # NEGATIVOS: todas las fotos del mismo restaurante en TRAIN
+    # NEGATIVOS (mismo restaurante en TRAIN)
     negs = train[train["id_restaurant"] == rest]
+
+    # excluir el positivo si coincide
+    negs = negs[negs["id_img"] != img]
 
     for _, neg in negs.iterrows():
         dev_rows.append({
@@ -83,11 +91,9 @@ for idx, row in dev.iterrows():
 DEV_IMG = pd.DataFrame(dev_rows)
 
 # -----------------------------
-# 6. Construir TEST_IMG igual que DEV_IMG
+# 7. TEST_IMG (negativos desde TRAIN+DEV)
 # -----------------------------
-train_dev_base = pd.concat([train, dev], ignore_index=True).reset_index(drop=True)
-train_dev_base["id_img"] = train_dev_base["id_img"].astype("int32")
-train_dev_base["id_restaurant"] = train_dev_base["id_restaurant"].astype("int32")
+train_dev_base = pd.concat([train, dev], ignore_index=True)
 
 test_rows = []
 
@@ -105,8 +111,11 @@ for idx, row in test.iterrows():
         "id_test": idx
     })
 
-    # NEGATIVOS
+    # NEGATIVOS (mismo restaurante en TRAIN+DEV)
     negs = train_dev_base[train_dev_base["id_restaurant"] == rest]
+
+    # excluir el positivo
+    negs = negs[negs["id_img"] != img]
 
     for _, neg in negs.iterrows():
         test_rows.append({
@@ -120,7 +129,7 @@ for idx, row in test.iterrows():
 TEST_IMG = pd.DataFrame(test_rows)
 
 # -----------------------------
-# 7. TRAIN_IMG y TRAIN_DEV_IMG
+# 8. TRAIN_IMG y TRAIN_DEV_IMG (solo positivos)
 # -----------------------------
 train["take"] = 1
 train["id_test"] = train.index
@@ -132,7 +141,7 @@ train_dev_for_training["id_test"] = train_dev_for_training.index
 TRAIN_DEV_IMG = train_dev_for_training.copy()
 
 # -----------------------------
-# 8. Guardado final
+# 9. Guardado final
 # -----------------------------
 TRAIN_IMG.to_pickle(f"{base_path}/TRAIN_IMG")
 DEV_IMG.to_pickle(f"{base_path}/DEV_IMG")
@@ -140,3 +149,17 @@ TEST_IMG.to_pickle(f"{base_path}/TEST_IMG")
 TRAIN_DEV_IMG.to_pickle(f"{base_path}/TRAIN_DEV_IMG")
 
 print("Todo generado correctamente.")
+
+# -----------------------------
+# 10. Verificaciones
+# -----------------------------
+print("\n--- Verificaciones ---")
+
+print("Positivos por id_test (DEV):")
+print(DEV_IMG.groupby("id_test")["is_dev"].sum().value_counts())
+
+print("Positivos por id_test (TEST):")
+print(TEST_IMG.groupby("id_test")["is_dev"].sum().value_counts())
+
+print("\nTamaño candidatos TEST:")
+print(TEST_IMG.groupby("id_test").size().describe())
