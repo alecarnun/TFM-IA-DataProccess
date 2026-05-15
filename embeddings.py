@@ -45,7 +45,7 @@ test = df_all.iloc[n_train+n_dev:].copy()
 # -----------------------------
 # 5. Generar embeddings
 # -----------------------------
-model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2")
+model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
 
 texts = df_all["review_full"].tolist()
 embeddings = model.encode(texts, show_progress_bar=True)
@@ -70,7 +70,8 @@ for idx, row in dev.iterrows():
         "id_img": img,
         "id_restaurant": rest,
         "is_dev": 1,
-        "id_test": idx
+        "id_test": idx,
+        "review_full": row["review_full"]
     })
 
     # NEGATIVOS (mismo restaurante en TRAIN)
@@ -85,7 +86,8 @@ for idx, row in dev.iterrows():
             "id_img": neg["id_img"],
             "id_restaurant": rest,
             "is_dev": 0,
-            "id_test": idx
+            "id_test": idx,
+            "review_full": neg["review_full"]
         })
 
 DEV_IMG = pd.DataFrame(dev_rows)
@@ -108,7 +110,8 @@ for idx, row in test.iterrows():
         "id_img": img,
         "id_restaurant": rest,
         "is_dev": 1,
-        "id_test": idx
+        "id_test": idx,
+        "review_full": row["review_full"]
     })
 
     # NEGATIVOS (mismo restaurante en TRAIN+DEV)
@@ -123,7 +126,8 @@ for idx, row in test.iterrows():
             "id_img": neg["id_img"],
             "id_restaurant": rest,
             "is_dev": 0,
-            "id_test": idx
+            "id_test": idx,
+            "review_full": neg["review_full"]
         })
 
 TEST_IMG = pd.DataFrame(test_rows)
