@@ -6,22 +6,22 @@ csv_path = "madrid.csv"
 city_name = "madrid"
 
 # ============================================================
-# 1. Cargar CSV original (NO se modifica)
+# 1) Cargar CSV original
 # ============================================================
 df = pd.read_csv(csv_path, sep=",", quotechar='"', engine="python")
 
 # ============================================================
-# 2. Extraer id_user sin tocar el CSV original
+# 2) Extraer id_user
 # ============================================================
 df["id_user"] = df["user_id"].str.split("_").str[1].str[:-4]
 
 # ============================================================
-# 3. Filtrar reseñas válidas
+# 3) Filtrar reseñas válidas
 # ============================================================
 df = df[df["review_full"].notnull() & (df["review_full"].astype(str).str.len() > 0)]
 
 # ============================================================
-# 4. Filtrar solo reseñas en inglés
+# 4) Filtrar solo reseñas en inglés
 # ============================================================
 def is_english(text):
     try:
@@ -32,19 +32,19 @@ def is_english(text):
 df = df[df["review_full"].apply(is_english)]
 
 # ============================================================
-# 5. Una reseña por restaurante por usuario
+# 5) Una reseña por restaurante por usuario
 # ============================================================
 df = df.sort_values("date").drop_duplicates(
     subset=["id_user", "url_restaurant"], keep="last"
 )
 
 # ============================================================
-# 6. Filtrar ratings 4 y 5
+# 6) Filtrar ratings 4 y 5
 # ============================================================
 df = df[df["rating_review"].isin([4, 5])]
 
 # ============================================================
-# 7. Separar usuarios según nº reseñas
+# 7) Separar usuarios según nº reseñas
 # ============================================================
 user_counts = df["id_user"].value_counts()
 users_1 = user_counts[user_counts == 1].index
@@ -54,7 +54,7 @@ df_1 = df[df["id_user"].isin(users_1)]
 df_2plus = df[df["id_user"].isin(users_2plus)]
 
 # ============================================================
-# 8. Crear train/test para usuarios con ≥2 reseñas
+# 8) Crear train/test para usuarios con ≥2 reseñas
 # ============================================================
 train_rows = []
 test_rows = []
@@ -68,12 +68,12 @@ train_df = pd.DataFrame(train_rows)
 test_df = pd.DataFrame(test_rows)
 
 # ============================================================
-# 9. Añadir usuarios con 1 reseña al train
+# 9) Añadir usuarios con 1 reseña al train
 # ============================================================
 train_df = pd.concat([train_df, df_1], ignore_index=True)
 
 # ============================================================
-# 10. Crear validation desde train
+# 10) Crear validation desde train
 # ============================================================
 train_rows_final = []
 val_rows = []
@@ -95,13 +95,13 @@ train_df = pd.DataFrame(train_rows_final)
 val_df = pd.DataFrame(val_rows)
 
 # ============================================================
-# 11. Crear id_restaurant SOLO en los splits finales
+# 11) Crear id_restaurant para los splits finales
 # ============================================================
 for split in [train_df, val_df, test_df]:
     split["id_restaurant"] = split["restaurant_name"].astype("category").cat.codes
 
 # ============================================================
-# 12. Seleccionar solo columnas necesarias para BRIE
+# 12) Seleccionar solo columnas necesarias para BRIE
 # ============================================================
 cols_to_keep = [
     "id_user",
@@ -115,7 +115,7 @@ val_df = val_df[cols_to_keep]
 test_df = test_df[cols_to_keep]
 
 # ============================================================
-# 13. Guardar PKL limpios
+# 13) Guardar PKL
 # ============================================================
 os.makedirs(f"preprocessed/{city_name}", exist_ok=True)
 
