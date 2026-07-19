@@ -10,7 +10,7 @@ base_path = f"preprocessed/{city}"
 os.makedirs(base_path, exist_ok=True)
 
 # -----------------------------
-# 1. Cargar particiones
+# 1) Cargar particiones
 # -----------------------------
 train = pd.read_pickle(f"{base_path}/train.pkl")
 dev = pd.read_pickle(f"{base_path}/val.pkl")
@@ -22,7 +22,7 @@ n_dev = len(dev)
 n_test = len(test)
 
 # -----------------------------
-# 2. Unir conjuntos
+# 2) Unir conjuntos
 # -----------------------------
 df_all = pd.concat([train, dev, test], ignore_index=True).reset_index(drop=True)
 
@@ -30,20 +30,20 @@ df_all = pd.concat([train, dev, test], ignore_index=True).reset_index(drop=True)
 df_all["id_img"] = df_all.index.astype("int32")
 
 # -----------------------------
-# 3. Codificación para todos
+# 3) Codificación para todos
 # -----------------------------
 df_all["id_user"] = df_all["id_user"].astype("category").cat.codes.astype("int32")
 df_all["id_restaurant"] = df_all["id_restaurant"].astype("category").cat.codes.astype("int32")
 
 # -----------------------------
-# 4. Volver a separar splits
+# 4) Volver a separar splits
 # -----------------------------
 train = df_all.iloc[:n_train].copy()
 dev = df_all.iloc[n_train:n_train+n_dev].copy()
 test = df_all.iloc[n_train+n_dev:].copy()
 
 # -----------------------------
-# 5. Generar embeddings
+# 5) Generar embeddings
 # -----------------------------
 model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
 
@@ -55,7 +55,7 @@ with open(f"{base_path}/IMG_VEC", "wb") as f:
     pickle.dump(embeddings, f)
 
 # -----------------------------
-# 6. DEV_IMG (negativos desde TRAIN)
+# 6) DEV_IMG (negativos desde TRAIN)
 # -----------------------------
 dev_rows = []
 
@@ -93,7 +93,7 @@ for idx, row in dev.iterrows():
 DEV_IMG = pd.DataFrame(dev_rows)
 
 # -----------------------------
-# 7. TEST_IMG (negativos desde TRAIN+DEV)
+# 7) TEST_IMG (negativos desde TRAIN+DEV)
 # -----------------------------
 train_dev_base = pd.concat([train, dev], ignore_index=True)
 
@@ -133,7 +133,7 @@ for idx, row in test.iterrows():
 TEST_IMG = pd.DataFrame(test_rows)
 
 # -----------------------------
-# 8. TRAIN_IMG y TRAIN_DEV_IMG (solo positivos)
+# 8) TRAIN_IMG y TRAIN_DEV_IMG (solo positivos)
 # -----------------------------
 train["take"] = 1
 train["id_test"] = train.index
@@ -145,7 +145,7 @@ train_dev_for_training["id_test"] = train_dev_for_training.index
 TRAIN_DEV_IMG = train_dev_for_training.copy()
 
 # -----------------------------
-# 9. Guardado final
+# 9) Guardado
 # -----------------------------
 TRAIN_IMG.to_pickle(f"{base_path}/TRAIN_IMG")
 DEV_IMG.to_pickle(f"{base_path}/DEV_IMG")
@@ -155,7 +155,7 @@ TRAIN_DEV_IMG.to_pickle(f"{base_path}/TRAIN_DEV_IMG")
 print("Todo generado correctamente.")
 
 # -----------------------------
-# 10. Verificaciones
+# 10) Verificaciones
 # -----------------------------
 print("\n--- Verificaciones ---")
 
