@@ -88,12 +88,44 @@ print("=" * 60)
 print("Randomly selecting users...")
 print("=" * 60)
 
-all_users = df["id_user"].unique().tolist()
+reviews_per_user = df.groupby("id_user").size()
 
-selected_users = random.sample(
-    all_users,
-    TARGET_USERS
-)
+distribution = Counter(reviews_per_user.values)
+
+selected_users = []
+
+total_users = reviews_per_user.shape[0]
+
+for n_reviews in sorted(distribution):
+
+    users = reviews_per_user[
+        reviews_per_user == n_reviews
+        ].index.tolist()
+
+    random.shuffle(users)
+
+    proportion = distribution[n_reviews] / total_users
+
+    n_select = round(proportion * TARGET_USERS)
+
+    selected_users.extend(users[:n_select])
+
+# Ajuste por redondeos
+if len(selected_users) > TARGET_USERS:
+    selected_users = random.sample(selected_users, TARGET_USERS)
+
+elif len(selected_users) < TARGET_USERS:
+
+    remaining = list(
+        set(df["id_user"]) - set(selected_users)
+    )
+
+    selected_users.extend(
+        random.sample(
+            remaining,
+            TARGET_USERS - len(selected_users)
+        )
+    )
 
 reduced_df = df[
     df["id_user"].isin(selected_users)
